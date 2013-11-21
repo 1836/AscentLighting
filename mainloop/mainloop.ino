@@ -303,3 +303,4 @@ uint32_t rainbowOrder(byte position)
     return leds.Color(0xFF, 0x00, 0xFF - position * 8);
   }
 }
+
