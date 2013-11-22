@@ -26,37 +26,63 @@
 #include <Adafruit_NeoPixel.h>
 #include "WS2812_Definitions.h"
 #include <Wire.h>
+#include "LPD8806.h"
+#include "SPI.h"
 
 
 #define PIN 4
 #define LED_COUNT 55
-#define I2C_ADDRESS 2
 
 // LED modes
 #define IDLE_MODE 0
 #define SHOOT_MODE 1
+#define NO_MODE 2
+
+#define I2C_ADDRESS 0x52
+
+// Number of RGB LEDs in strand:
+int nLEDs = 22;
+
+// Chose 2 pins for output; can be any valid output pins:
+int dataPin  = 5;
+int clockPin = 6;
+
+//setup stuff for longshoot loop
+uint16_t wait = 500;
+int maxshots = 3;  //there is only allowed to be 3 shots on the strip at any one time
+int shotcount[3];  //this is a counter to keep track of the places the shots are
+int arraycount = 0;  //this makes sure that the shotcount array does not go past it's boundary
+
+
+LPD8806 strip = LPD8806(nLEDs, dataPin, clockPin);
 
 // Create an instance of the Adafruit_NeoPixel class called "leds".
 // That'll be what we refer to from here on...
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800);
 
 // Speed of the shooter (eventually we'll get this from I2C...)
-int shooter_speed = 1000;
+int shooter_speed = 3000;
 
 // LED mode
-int led_mode = IDLE_MODE;
+int led_mode = NO_MODE;
 
 void setup()
 {
   leds.begin();  // Call this to start up the LED strip.
   
   // Startup I2C
-  Wire.begin(I2C_ADDRESS);
-  Wire.onReceive(i2cEvent);
-  Serial.begin(9600);
+  Wire.begin(I2C_ADDRESS);                // join i2c bus with address #4
+  Wire.onReceive(event); // register event
+  Serial.begin(9600);           // start serial for output
   
   clearLEDs();   // This function, defined below, turns all LEDs off...
   leds.show();   // ...but the LEDs don't actually update until you call this.
+  
+  // Start up the LED strip
+  strip.begin();
+
+  // Update the strip, to start they are all 'off'
+  strip.show();
 }
 
 void loop()
@@ -75,29 +101,37 @@ void loop()
     
     else
     {
-      cascade(RED, TOP_DOWN, 25);
+      for (int i=0; i<10; i++)
+      {
+         cascade(RED, TOP_DOWN, 25);
+      }
+      shooter_speed = 0;
+      shootingLoop();
+      delay(5000);
+       for (int i=0; i<10; i++)
+      {
+         shooter_speed += 300;
+         shootingLoop();
+      }
     }
     
     
 }
 
-// handles an i2c message
-void i2cEvent(int howMany)
+void event(int howMany)
 {
-  while (Wire.available() > 0)
+  while(1 < Wire.available()) // loop through all but the last
   {
-    unsigned char i = Wire.read();
-    if (i == 255)
-    {
-      led_mode = IDLE_MODE;
-      shooter_speed = 0;
-    }
-    else
+    char c = Wire.read(); // receive byte as a character
+    Serial.print(c);         // print the character
+    if (c == 255)
     {
       led_mode = SHOOT_MODE;
-      shooter_speed = i * 1000;
     }
   }
+  int x = Wire.read();    // receive byte as an integer
+  Serial.println(x);         // print the integer
+
 }
 
 // Implements a little larson "cylon" sanner.
@@ -156,6 +190,7 @@ void cascade(unsigned long color, byte direction, byte wait)
     {
       clearLEDs();  // Turn off all LEDs
       leds.setPixelColor(i, color);  // Set just this one
+      strip.setPixelColor(i, color);
       
       // Slowly drop off...
       for (int j=1; j<17; j++)
@@ -172,9 +207,13 @@ void cascade(unsigned long color, byte direction, byte wait)
         
         leds.setPixelColor((i+j) % LED_COUNT, dimColor);
         leds.setPixelColor((i-j) % LED_COUNT, dimColor);
+        
+        strip.setPixelColor((i+j) % LED_COUNT, dimColor);
+        strip.setPixelColor((i-j) % LED_COUNT, dimColor);
       }
       
       leds.show();
+      strip.show();
       delay(wait);
     }
   }
@@ -295,5 +334,9 @@ uint32_t rainbowOrder(byte position)
     position -= 159;
     return leds.Color(0xFF, 0x00, 0xFF - position * 8);
   }
+  
+  
+  
+  
 }
 
