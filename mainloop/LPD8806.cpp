@@ -294,3 +294,5 @@ uint32_t LPD8806::getPixelColor(uint16_t n) {
 
   return 0; // Pixel # is out of bounds
 }
+
+

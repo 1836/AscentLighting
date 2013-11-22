@@ -1,28 +1,28 @@
 /* SparkFun WS2812 Breakout Board Example
-  SparkFun Electronics
-  date: July 25, 2013
-  license: GNU GENERAL PUBLIC LICENSE
-  
-  Requires the Adafruit NeoPixel library. It's awesome, go get it.
-  https://github.com/adafruit/Adafruit_NeoPixel
-  
-  This simple example code runs three sets of animations on a group of WS2812
-  breakout boards. The more boards you link up, the better these animations
-  will look. 
-  
-  For help linking WS2812 breakouts, checkout our hookup guide:
-  https://learn.sparkfun.com/tutorials/ws2812-breakout-hookup-guide
-  
-  Before uploading the code, make sure you adjust the two defines at the
-  top of this sketch: PIN and LED_COUNT. Pin should be the Arduino pin
-  you've got connected to the first pixel's DIN pin. By default it's
-  set to Arduino pin 4. LED_COUNT should be the number of breakout boards
-  you have linked up.
-  
-  I didn't copy this...
-  
-  Nathan Hakkakzadeh
-*/
+ SparkFun Electronics
+ date: July 25, 2013
+ license: GNU GENERAL PUBLIC LICENSE
+ 
+ Requires the Adafruit NeoPixel library. It's awesome, go get it.
+ https://github.com/adafruit/Adafruit_NeoPixel
+ 
+ This simple example code runs three sets of animations on a group of WS2812
+ breakout boards. The more boards you link up, the better these animations
+ will look. 
+ 
+ For help linking WS2812 breakouts, checkout our hookup guide:
+ https://learn.sparkfun.com/tutorials/ws2812-breakout-hookup-guide
+ 
+ Before uploading the code, make sure you adjust the two defines at the
+ top of this sketch: PIN and LED_COUNT. Pin should be the Arduino pin
+ you've got connected to the first pixel's DIN pin. By default it's
+ set to Arduino pin 4. LED_COUNT should be the number of breakout boards
+ you have linked up.
+ 
+ I didn't copy this...
+ 
+ Nathan Hakkakzadeh
+ */
 #include <Adafruit_NeoPixel.h>
 #include "WS2812_Definitions.h"
 #include <Wire.h>
@@ -69,15 +69,15 @@ int led_mode = NO_MODE;
 void setup()
 {
   leds.begin();  // Call this to start up the LED strip.
-  
+
   // Startup I2C
   Wire.begin(I2C_ADDRESS);                // join i2c bus with address #4
-  Wire.onReceive(event); // register event
+  Wire.onReceive(receiveEvent); // register event
   Serial.begin(9600);           // start serial for output
-  
+
   clearLEDs();   // This function, defined below, turns all LEDs off...
   leds.show();   // ...but the LEDs don't actually update until you call this.
-  
+
   // Start up the LED strip
   strip.begin();
 
@@ -87,38 +87,38 @@ void setup()
 
 void loop()
 {
-    // What we do depends on what mode we are in...
-    
-    if (led_mode == IDLE_MODE)
+  // What we do depends on what mode we are in...
+
+  if (led_mode == IDLE_MODE)
+  {
+    cascade(RED, TOP_DOWN, 25);
+  }
+
+  else if (led_mode == SHOOT_MODE)
+  {
+    shootingLoop();
+  }
+
+  else
+  {
+    for (int i=0; i<10; i++)
     {
       cascade(RED, TOP_DOWN, 25);
     }
-    
-    else if (led_mode == SHOOT_MODE)
+    shooter_speed = 0;
+    shootingLoop();
+    delay(5000);
+    for (int i=0; i<10; i++)
     {
+      shooter_speed += 300;
       shootingLoop();
     }
-    
-    else
-    {
-      for (int i=0; i<10; i++)
-      {
-         cascade(RED, TOP_DOWN, 25);
-      }
-      shooter_speed = 0;
-      shootingLoop();
-      delay(5000);
-       for (int i=0; i<10; i++)
-      {
-         shooter_speed += 300;
-         shootingLoop();
-      }
-    }
-    
-    
+  }
+
+
 }
 
-void event(int howMany)
+void receiveEvent(int howMany)
 {
   while(1 < Wire.available()) // loop through all but the last
   {
@@ -145,7 +145,7 @@ void cylon(unsigned long color, byte wait)
   byte red = (color & 0xFF0000) >> 16;
   byte green = (color & 0x00FF00) >> 8;
   byte blue = (color & 0x0000FF);
-  
+
   // Start at closest LED, and move to the outside
   for (int i=0; i<=LED_COUNT-1; i++)
   {
@@ -162,7 +162,7 @@ void cylon(unsigned long color, byte wait)
     leds.show();  // Turn the LEDs on
     delay(wait);  // Delay for visibility
   }
-  
+
   // Now we go back to where we came. Do the same thing.
   for (int i=LED_COUNT-2; i>=1; i--)
   {
@@ -174,8 +174,8 @@ void cylon(unsigned long color, byte wait)
         leds.setPixelColor(i-j, red/(weight*j), green/(weight*j), blue/(weight*j));
       if (i-j <= LED_COUNT)
         leds.setPixelColor(i+j, red/(weight*j), green/(weight*j), blue/(weight*j));
-      }
-    
+    }
+
     leds.show();
     delay(wait);
   }
@@ -191,7 +191,7 @@ void cascade(unsigned long color, byte direction, byte wait)
       clearLEDs();  // Turn off all LEDs
       leds.setPixelColor(i, color);  // Set just this one
       strip.setPixelColor(i, color);
-      
+
       // Slowly drop off...
       for (int j=1; j<17; j++)
       {
@@ -204,14 +204,14 @@ void cascade(unsigned long color, byte direction, byte wait)
         {
           dimColor = 0x110000;
         }
-        
+
         leds.setPixelColor((i+j) % LED_COUNT, dimColor);
         leds.setPixelColor((i-j) % LED_COUNT, dimColor);
-        
+
         strip.setPixelColor((i+j) % LED_COUNT, dimColor);
         strip.setPixelColor((i-j) % LED_COUNT, dimColor);
       }
-      
+
       leds.show();
       strip.show();
       delay(wait);
@@ -231,31 +231,31 @@ void cascade(unsigned long color, byte direction, byte wait)
 
 void shootingLoop()
 {
-    if (shooter_speed > 0)
+  if (shooter_speed > 0)
+  {
+    // Loop through LEDs...
+    for (int i=6; i<LED_COUNT; i++)
     {
-      // Loop through LEDs...
-      for (int i=6; i<LED_COUNT; i++)
-      {
-        clearLEDs();
-        setRainbowBottom();
-        leds.setPixelColor(i % LED_COUNT+6, RED);
-        leds.setPixelColor((i+1) % LED_COUNT+6, 0x880000);
-        leds.setPixelColor((i-1) % LED_COUNT+6, 0x880000);
-      
-        leds.setPixelColor((i+2) % LED_COUNT+6, 0x110000);
-        leds.setPixelColor((i-2) % LED_COUNT+6, 0x110000);
-        leds.show();
-        delay(25000/shooter_speed);
-      }
-    }
-    else {
       clearLEDs();
       setRainbowBottom();
-      leds.setPixelColor(6, RED);
-      leds.setPixelColor(7, RED);
-      leds.setPixelColor(8, RED);
+      leds.setPixelColor(i % LED_COUNT+6, RED);
+      leds.setPixelColor((i+1) % LED_COUNT+6, 0x880000);
+      leds.setPixelColor((i-1) % LED_COUNT+6, 0x880000);
+
+      leds.setPixelColor((i+2) % LED_COUNT+6, 0x110000);
+      leds.setPixelColor((i-2) % LED_COUNT+6, 0x110000);
       leds.show();
+      delay(25000/shooter_speed);
     }
+  }
+  else {
+    clearLEDs();
+    setRainbowBottom();
+    leds.setPixelColor(6, RED);
+    leds.setPixelColor(7, RED);
+    leds.setPixelColor(8, RED);
+    leds.show();
+  }
 }
 
 void setRainbowBottom()
@@ -266,7 +266,7 @@ void setRainbowBottom()
   leds.setPixelColor(3, GREEN);
   leds.setPixelColor(4, YELLOW);
   leds.setPixelColor(5, ORANGE);
-  
+
 }
 
 // Sets all LEDs to off, but DOES NOT update the display;
@@ -287,7 +287,7 @@ void rainbow(byte startPosition)
   // Need to scale our rainbow. We want a variety of colors, even if there
   // are just 10 or so pixels.
   int rainbowScale = 192 / LED_COUNT;
-  
+
   // Next we setup each pixel with the right color
   for (int i=0; i<LED_COUNT; i++)
   {
@@ -334,9 +334,8 @@ uint32_t rainbowOrder(byte position)
     position -= 159;
     return leds.Color(0xFF, 0x00, 0xFF - position * 8);
   }
-  
-  
-  
-  
-}
 
+
+
+
+}
