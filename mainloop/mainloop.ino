@@ -25,10 +25,16 @@
 */
 #include <Adafruit_NeoPixel.h>
 #include "WS2812_Definitions.h"
+#include <Wire.h>
 
 
 #define PIN 4
-#define LED_COUNT 60
+#define LED_COUNT 55
+#define I2C_ADDRESS 2
+
+// LED modes
+#define IDLE_MODE 0
+#define SHOOT_MODE 1
 
 // Create an instance of the Adafruit_NeoPixel class called "leds".
 // That'll be what we refer to from here on...
@@ -37,42 +43,61 @@ Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, PIN, NEO_GRB + NEO_KHZ800)
 // Speed of the shooter (eventually we'll get this from I2C...)
 int shooter_speed = 1000;
 
+// LED mode
+int led_mode = IDLE_MODE;
+
 void setup()
 {
   leds.begin();  // Call this to start up the LED strip.
+  
+  // Startup I2C
+  Wire.begin(I2C_ADDRESS);
+  Wire.onReceive(i2cEvent);
+  Serial.begin(9600);
+  
   clearLEDs();   // This function, defined below, turns all LEDs off...
   leds.show();   // ...but the LEDs don't actually update until you call this.
 }
 
 void loop()
 {
-  /*
-  // Ride the Rainbow Road
-  for (int i=0; i<LED_COUNT*10; i++)
-  {
-    rainbow(i);
-    delay(100);  // Delay between rainbow slides
-  }
-  
-  // Indigo cylon
-  // Do a cylon (larson scanner) cycle 10 times
-  for (int i=0; i<10; i++)
-  {
-    // cylon function: first param is color, second is time (in ms) between cycles
-    cylon(INDIGO, 500);  // Indigo cylon eye!
-  } */
-  
-    // Runs lights down
-    // First parameter is the color, second is direction, third is ms between falls
-    shooter_speed = 0;
-
-    shootingLoop();
-    delay(5000);
-    shooter_speed = 3500;
-    for (int i=0; i<500; i++)
+    // What we do depends on what mode we are in...
+    
+    if (led_mode == IDLE_MODE)
+    {
+      cascade(RED, TOP_DOWN, 25);
+    }
+    
+    else if (led_mode == SHOOT_MODE)
     {
       shootingLoop();
     }
+    
+    else
+    {
+      cascade(RED, TOP_DOWN, 25);
+    }
+    
+    
+}
+
+// handles an i2c message
+void i2cEvent(int howMany)
+{
+  while (Wire.available() > 0)
+  {
+    unsigned char i = Wire.read();
+    if (i == 255)
+    {
+      led_mode = IDLE_MODE;
+      shooter_speed = 0;
+    }
+    else
+    {
+      led_mode = SHOOT_MODE;
+      shooter_speed = i * 1000;
+    }
+  }
 }
 
 // Implements a little larson "cylon" sanner.
@@ -127,59 +152,27 @@ void cascade(unsigned long color, byte direction, byte wait)
 {
   if (direction == TOP_DOWN)
   {
-    for (int i=0; i<LED_COUNT; i++)
+    for (int i=LED_COUNT-1; i>=0; i--)
     {
       clearLEDs();  // Turn off all LEDs
       leds.setPixelColor(i, color);  // Set just this one
       
-      // This is manual dropoff code... i'll fix it to make it more general in the future...
-      leds.setPixelColor((i+1) % LED_COUNT, 0xEE0000);
-      leds.setPixelColor((i-1) % LED_COUNT, 0xEE0000);
-      
-      leds.setPixelColor((i+2) % LED_COUNT, 0xDD0000);
-      leds.setPixelColor((i-2) % LED_COUNT , 0xDD0000);
-      
-      leds.setPixelColor((i+3) % LED_COUNT, 0xCC0000);
-      leds.setPixelColor((i-3) % LED_COUNT, 0xCC0000);
-      
-      leds.setPixelColor((i+4) % LED_COUNT, 0xBB0000);
-      leds.setPixelColor((i-4) % LED_COUNT, 0xBB0000);
-      
-      leds.setPixelColor((i+5) % LED_COUNT, 0xAA0000);
-      leds.setPixelColor((i-5) % LED_COUNT, 0xAA0000);
-      
-      leds.setPixelColor((i+6) % LED_COUNT, 0x990000);
-      leds.setPixelColor((i-6) % LED_COUNT, 0x990000);
-      
-      leds.setPixelColor((i+7) % LED_COUNT, 0x880000);
-      leds.setPixelColor((i-7) % LED_COUNT, 0x880000);
-      
-      leds.setPixelColor((i+8) % LED_COUNT, 0x770000);
-      leds.setPixelColor((i-8) % LED_COUNT, 0x770000);
-      
-      leds.setPixelColor((i+9) % LED_COUNT, 0x660000);
-      leds.setPixelColor((i-9) % LED_COUNT, 0x660000);
-      
-      leds.setPixelColor((i+10) % LED_COUNT, 0x550000);
-      leds.setPixelColor((i-10) % LED_COUNT, 0x550000);
-      
-      leds.setPixelColor((i+11) % LED_COUNT, 0x440000);
-      leds.setPixelColor((i-11) % LED_COUNT, 0x440000);
-      
-      leds.setPixelColor((i+12) % LED_COUNT, 0x330000);
-      leds.setPixelColor((i-12) % LED_COUNT, 0x330000);
-      
-      leds.setPixelColor((i+13) % LED_COUNT, 0x220000);
-      leds.setPixelColor((i-13) % LED_COUNT, 0x220000);
-      
-      leds.setPixelColor((i+14) % LED_COUNT, 0x110000);
-      leds.setPixelColor((i-14) % LED_COUNT, 0x110000);
-      
-      leds.setPixelColor((i+15) % LED_COUNT, 0x110000);
-      leds.setPixelColor((i-15) % LED_COUNT, 0x110000);
-      
-      leds.setPixelColor((i+16) % LED_COUNT, 0x110000);
-      leds.setPixelColor((i-16) % LED_COUNT, 0x110000);
+      // Slowly drop off...
+      for (int j=1; j<17; j++)
+      {
+        unsigned long dimColor;
+        if (j < 15)
+        {
+          dimColor = color - (0x110000 * j);
+        }
+        else
+        {
+          dimColor = 0x110000;
+        }
+        
+        leds.setPixelColor((i+j) % LED_COUNT, dimColor);
+        leds.setPixelColor((i-j) % LED_COUNT, dimColor);
+      }
       
       leds.show();
       delay(wait);
@@ -213,7 +206,7 @@ void shootingLoop()
         leds.setPixelColor((i+2) % LED_COUNT+6, 0x110000);
         leds.setPixelColor((i-2) % LED_COUNT+6, 0x110000);
         leds.show();
-        delay(50000/shooter_speed);
+        delay(25000/shooter_speed);
       }
     }
     else {
