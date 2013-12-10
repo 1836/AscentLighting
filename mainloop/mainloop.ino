@@ -26,8 +26,8 @@
 #include <Adafruit_NeoPixel.h>
 #include "WS2812_Definitions.h"
 #include <Wire.h>
-//#include "LPD8806.h"
-//#include "SPI.h"
+#include "LPD8806.h"
+#include "SPI.h"
 
 
 #define PIN 4
@@ -41,11 +41,11 @@
 #define I2C_ADDRESS 0x52
 
 // Number of RGB LEDs in strand:
-//int nLEDs = 22;
+int nLEDs = 22;
 
 // Chose 2 pins for output; can be any valid output pins:
-//int dataPin  = 5;
-//int clockPin = 6;
+int dataPin  = 5;
+int clockPin = 6;
 
 //setup stuff for longshoot loop
 uint16_t wait = 500;
@@ -54,7 +54,7 @@ int shotcount[3];  //this is a counter to keep track of the places the shots are
 int arraycount = 0;  //this makes sure that the shotcount array does not go past it's boundary
 
 
-//LPD8806 strip = LPD8806(nLEDs, dataPin, clockPin);
+LPD8806 strip = LPD8806(nLEDs, dataPin, clockPin);
 
 // Create an instance of the Adafruit_NeoPixel class called "leds".
 // That'll be what we refer to from here on...
@@ -74,16 +74,32 @@ void setup()
   Wire.begin(I2C_ADDRESS);                // join i2c bus with address #4
   Wire.onReceive(receiveEvent); // register event
   Serial.begin(9600);           // start serial for output
+  
+  #ifndef cbi
+  #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+  #endif
+  
+   #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega328P__)
+    // deactivate internal pull-ups for twi
+    // as per note from atmega8 manual pg167
+    cbi(PORTC, 4);
+    cbi(PORTC, 5);
+  #else
+    // deactivate internal pull-ups for twi
+    // as per note from atmega128 manual pg204
+    cbi(PORTD, 0);
+    cbi(PORTD, 1);
+  #endif
 
   clearLEDs();   // This function, defined below, turns all LEDs off...
   leds.show();   // ...but the LEDs don't actually update until you call this.
-/*
+
   // Start up the LED strip
   strip.begin();
 
   // Update the strip, to start they are all 'off'
   strip.show();
-*/
+
 }
 
 
@@ -103,7 +119,7 @@ void loop()
 
   else
   {
-    /*
+    
     for (int i=0; i<10; i++)
     {
       cascade(RED, TOP_DOWN, 25);
@@ -115,7 +131,7 @@ void loop()
     {
       shooter_speed += 300;
       shootingLoop();
-    } */
+    }
   }
 
 
@@ -138,7 +154,7 @@ void receiveEvent(int howMany)
     {
       led_mode = SHOOT_MODE;
       shooter_speed = c * 100;
-      Serial.println("Shooter Mode");
+      Serial.println(shooter_speed);
     }
   }
   int x = Wire.read();    // receive byte as an 
@@ -233,12 +249,12 @@ void cascade(unsigned long color, byte direction, byte wait)
         leds.setPixelColor((i+j) % LED_COUNT, dimColor);
         leds.setPixelColor((i-j) % LED_COUNT, dimColor);
 
-      //  strip.setPixelColor((i+j) % LED_COUNT, dimColor);
-      //  strip.setPixelColor((i-j) % LED_COUNT, dimColor);
+        strip.setPixelColor((i+j) % LED_COUNT, dimColor);
+        strip.setPixelColor((i-j) % LED_COUNT, dimColor);
       }
 
       leds.show();
-//      strip.show();
+      strip.show();
       delay(wait);
     }
   }
