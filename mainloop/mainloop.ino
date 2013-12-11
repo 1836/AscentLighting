@@ -53,6 +53,10 @@ int maxshots = 3;  //there is only allowed to be 3 shots on the strip at any one
 int shotcount[3];  //this is a counter to keep track of the places the shots are
 int arraycount = 0;  //this makes sure that the shotcount array does not go past it's boundary
 
+char buf [100];
+volatile byte pos;
+volatile boolean process_it;
+
 
 LPD8806 strip = LPD8806(nLEDs, dataPin, clockPin);
 
@@ -71,25 +75,25 @@ void setup()
   leds.begin();  // Call this to start up the LED strip.
 
   // Startup I2C
+  /*
   Wire.begin(I2C_ADDRESS);                // join i2c bus with address #4
   Wire.onReceive(receiveEvent); // register event
+  */
+  
+   // have to send on master in, *slave out*
+  pinMode(MISO, OUTPUT);
+  
+  // turn on SPI in slave mode
+  SPCR |= _BV(SPE);
+  
+  // get ready for an interrupt 
+  pos = 0;   // buffer empty
+  process_it = false;
+
+  // now turn on interrupts
+  SPI.attachInterrupt();
+  
   Serial.begin(9600);           // start serial for output
-  
-  #ifndef cbi
-  #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-  #endif
-  
-   #if defined(__AVR_ATmega168__) || defined(__AVR_ATmega8__) || defined(__AVR_ATmega328P__)
-    // deactivate internal pull-ups for twi
-    // as per note from atmega8 manual pg167
-    cbi(PORTC, 4);
-    cbi(PORTC, 5);
-  #else
-    // deactivate internal pull-ups for twi
-    // as per note from atmega128 manual pg204
-    cbi(PORTD, 0);
-    cbi(PORTD, 1);
-  #endif
 
   clearLEDs();   // This function, defined below, turns all LEDs off...
   leds.show();   // ...but the LEDs don't actually update until you call this.
@@ -102,9 +106,41 @@ void setup()
 
 }
 
+// SPI interrupt routine
+ISR (SPI_STC_vect)
+{
+byte c = SPDR;  // grab byte from SPI Data Register
+  
+  // add to buffer if room
+  if (pos < sizeof buf)
+    {
+    buf [pos++] = c;
+    
+    // example: newline means time to process buffer
+    if (c == '\n')
+      process_it = true;
+      
+    }  // end of room available
+}  // end of interrupt routine SPI_STC_vect
+
+
 
 void loop()
 {
+  
+  if (process_it)
+    {
+    buf [pos] = 0;  
+    if (buf == "idle") {
+      led_mode = IDLE_MODE;
+    } else {
+      led_mode = SHOOT_MODE;
+      shooter_speed = buf[0] * 100;
+    }
+    pos = 0;
+    process_it = false;
+    }  // end of flag set
+  
   // What we do depends on what mode we are in...
 
   if (led_mode == IDLE_MODE)
